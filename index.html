@@ -222,19 +222,45 @@
 
     <script>
         // --- Constants & Config ---
+        // Detect mobile devices
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+            || window.innerWidth < 768;
+        
         const CONFIG = {
             coinRadius: 1.5,
             coinThickness: 0.2,
             flipForce: 25, 
             flipTorque: 10,
-            pixelRatio: 0.25,
+            pixelRatio: isMobile ? 0.35 : 0.25, // Slightly higher pixel ratio on mobile for performance
             colors: {
                 floor: 0x0f172a,
                 ambient: 0x505050,
                 light: 0xffffff,
                 coinSide: 0xb59e5f
+            },
+            // Mobile-optimized settings
+            mobile: {
+                shelfBottleRows: 1,      // 1 row instead of 2
+                shelfBottleCols: 3,      // 3 bottles instead of 6
+                floorBottlesLaying: 3,   // Reduced from 8
+                floorBottlesStanding: 2, // Reduced from 6
+                shelfLevels: 4,          // 4 levels instead of 6
+                oilSpills: 8,            // Reduced from 20
+                physicsIterations: 8     // Reduced from 15
+            },
+            desktop: {
+                shelfBottleRows: 2,
+                shelfBottleCols: 6,
+                floorBottlesLaying: 8,
+                floorBottlesStanding: 6,
+                shelfLevels: 6,
+                oilSpills: 20,
+                physicsIterations: 15
             }
         };
+        
+        // Use appropriate settings based on device
+        const DEVICE = isMobile ? CONFIG.mobile : CONFIG.desktop;
         
         // Calculate dynamic coin size based on viewport (NORMAL coin size - everything else is HUGE)
         function calculateCoinSize() {
@@ -506,8 +532,8 @@
             world = new CANNON.World();
             world.gravity.set(0, -9.82, 0);
             world.broadphase = new CANNON.NaiveBroadphase();
-            world.solver.iterations = 15; // More iterations for better collision resolution
-            world.solver.tolerance = 0.001; // Tighter tolerance
+            world.solver.iterations = DEVICE.physicsIterations;
+            world.solver.tolerance = 0.001;
 
             // Materials
             const physicsMaterial = new CANNON.Material("groundMaterial");
@@ -749,11 +775,11 @@
                     }
                 }
                 
-                // Shelves (6 levels - PACKED)
+                // Shelves - levels based on device
                 const shelfGeo = new THREE.BoxGeometry(83, 0.8, 30);
                 const shelfMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
                 
-                for (let level = 0; level < 6; level++) {
+                for (let level = 0; level < DEVICE.shelfLevels; level++) {
                     const shelf = new THREE.Mesh(shelfGeo, shelfMat);
                     shelf.position.y = level * 15 + 10;
                     shelf.receiveShadow = true;
@@ -781,9 +807,9 @@
                     
                     world.addBody(shelfBody);
                     
-                    // PACK IT FULL - 6 bottles across, 2 rows deep = 12 per shelf!
-                    for (let row = 0; row < 2; row++) {
-                        for (let col = 0; col < 6; col++) {
+                    // Bottles on shelf - count based on device
+                    for (let row = 0; row < DEVICE.shelfBottleRows; row++) {
+                        for (let col = 0; col < DEVICE.shelfBottleCols; col++) {
                             // 60% chance of being filled
                             const isFilled = Math.random() > 0.4;
                             const bottle = createFullSizeBottle(
@@ -899,9 +925,11 @@
             // Store skybox reference globally for image upload
             window.skyboxMesh = skybox;
             
-            // Warmer fluorescent lights
-            for (let i = 0; i < 6; i++) {
-                for (let j = 0; j < 5; j++) {
+            // Warmer fluorescent lights - reduced on mobile
+            const lightRows = isMobile ? 3 : 6;
+            const lightCols = isMobile ? 3 : 5;
+            for (let i = 0; i < lightRows; i++) {
+                for (let j = 0; j < lightCols; j++) {
                     const lightPanelGeo = new THREE.BoxGeometry(22, 0.5, 7);
                     const lightPanelMat = new THREE.MeshBasicMaterial({ 
                         color: 0xfff8e7 // Warm white light
@@ -916,30 +944,34 @@
                 }
             }
             
-            // Create compact but PACKED supermarket (smaller map, still looks full)
-            // Use consistent grid spacing for all shelves
+            // Create supermarket layout - reduced on mobile for performance
             const GRID_SPACING = 65;
+            const shelfSections = isMobile ? 2 : 3; // Fewer shelf sections on mobile
             
-            // Left side aisles (3 sections)
-            for (let i = 0; i < 3; i++) {
+            // Left side aisles
+            for (let i = 0; i < shelfSections; i++) {
                 scene.add(createSupermarketShelf(-GRID_SPACING, i * GRID_SPACING - GRID_SPACING, Math.PI / 2));
             }
             
-            // Right side aisles (3 sections)
-            for (let i = 0; i < 3; i++) {
+            // Right side aisles
+            for (let i = 0; i < shelfSections; i++) {
                 scene.add(createSupermarketShelf(GRID_SPACING, i * GRID_SPACING - GRID_SPACING, -Math.PI / 2));
             }
             
-            // Back wall endcaps - aligned to grid
-            for (let i = 0; i < 2; i++) {
-                const xPos = (i === 0) ? -GRID_SPACING / 2 : GRID_SPACING / 2;
-                scene.add(createSupermarketShelf(xPos, -GRID_SPACING * 2, 0));
+            // Back wall endcaps - skip on mobile
+            if (!isMobile) {
+                for (let i = 0; i < 2; i++) {
+                    const xPos = (i === 0) ? -GRID_SPACING / 2 : GRID_SPACING / 2;
+                    scene.add(createSupermarketShelf(xPos, -GRID_SPACING * 2, 0));
+                }
             }
             
-            // Front wall endcaps - aligned to grid
-            for (let i = 0; i < 2; i++) {
-                const xPos = (i === 0) ? -GRID_SPACING / 2 : GRID_SPACING / 2;
-                scene.add(createSupermarketShelf(xPos, GRID_SPACING * 2, Math.PI));
+            // Front wall endcaps - skip on mobile
+            if (!isMobile) {
+                for (let i = 0; i < 2; i++) {
+                    const xPos = (i === 0) ? -GRID_SPACING / 2 : GRID_SPACING / 2;
+                    scene.add(createSupermarketShelf(xPos, GRID_SPACING * 2, Math.PI));
+                }
             }
             
             // Helper to check if position is in coin spawn zone (keep area clear)
@@ -979,7 +1011,7 @@
             
             // Floor bottles - laying down (static, no physics movement)
             // Visual cylinder radius is 6, so center at y=7 puts bottom at y=1 (above floor)
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < DEVICE.floorBottlesLaying; i++) {
                 const pos = findValidBottlePosition(100, 150);
                 if (!pos.valid) continue; // Skip if no valid position found
                 
@@ -1017,7 +1049,7 @@
             
             // Standing bottles (static, no physics movement)
             // Visual cylinder half-height is 13.5, so center at y=14.5 puts bottom at y=1
-            for (let i = 0; i < 6; i++) {
+            for (let i = 0; i < DEVICE.floorBottlesStanding; i++) {
                 const pos = findValidBottlePosition(90, 130);
                 if (!pos.valid) continue; // Skip if no valid position found
                 
@@ -1038,7 +1070,7 @@
             }
             
             // Oil spills
-            for (let i = 0; i < 20; i++) {
+            for (let i = 0; i < DEVICE.oilSpills; i++) {
                 scene.add(createOilSpill(
                     (Math.random() - 0.5) * 120,
                     (Math.random() - 0.5) * 180,
