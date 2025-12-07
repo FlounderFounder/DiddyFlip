@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiddyFlip</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Add Pixel Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Apply pixel font globally */
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #1e293b; 
+            user-select: none; 
+            font-family: 'Press Start 2P', cursive;
+        }
+        #canvas-container { width: 100vw; height: 100vh; }
+        
+        /* Power bar shake animation */
+        @keyframes shake-light {
+            0%, 100% { transform: translate(80px, -50%) translateX(0); }
+            25% { transform: translate(80px, -50%) translateX(-1px); }
+            75% { transform: translate(80px, -50%) translateX(1px); }
+        }
+        @keyframes shake-medium {
+            0%, 100% { transform: translate(80px, -50%) translateX(0); }
+            20% { transform: translate(80px, -50%) translateX(-2px); }
+            40% { transform: translate(80px, -50%) translateX(2px); }
+            60% { transform: translate(80px, -50%) translateX(-2px); }
+            80% { transform: translate(80px, -50%) translateX(1px); }
+        }
+        @keyframes shake-heavy {
+            0%, 100% { transform: translate(80px, -50%) translateX(0); }
+            10% { transform: translate(80px, -50%) translate(-3px, -1px); }
+            20% { transform: translate(80px, -50%) translate(3px, 1px); }
+            30% { transform: translate(80px, -50%) translate(-3px, 0); }
+            40% { transform: translate(80px, -50%) translate(3px, -1px); }
+            50% { transform: translate(80px, -50%) translate(-2px, 1px); }
+            60% { transform: translate(80px, -50%) translate(3px, 0); }
+            70% { transform: translate(80px, -50%) translate(-3px, -1px); }
+            80% { transform: translate(80px, -50%) translate(2px, 1px); }
+            90% { transform: translate(80px, -50%) translate(-2px, 0); }
+        }
+        .shake-light { animation: shake-light 0.15s infinite; }
+        .shake-medium { animation: shake-medium 0.1s infinite; }
+        .shake-heavy { animation: shake-heavy 0.08s infinite; }
+        
+        /* Force pixelated rendering on the canvas */
+        #canvas-container canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges; 
+        }
+
+        .ui-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            text-align: center;
+            width: 90%;
+            max-width: 350px;
+        }
+        
+        .mute-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #334155;
+            border: 4px solid #000;
+            padding: 10px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px #000;
+            color: #fbbf24;
+            transition: transform 0.1s;
+            z-index: 10;
+        }
+        .mute-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #000;
+        }
+
+        .result-display {
+            font-size: 2rem;
+            color: #fbbf24;
+            /* Solid pixel shadow */
+            text-shadow: 4px 4px 0px #000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        .result-display.visible { opacity: 1; }
+        
+        /* Pixel-style containers */
+        .pixel-box {
+            background: #334155;
+            padding: 0.5rem;
+            border: 4px solid #000;
+            box-shadow: 6px 6px 0px #000;
+        }
+
+        /* Pixel-style slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 16px;
+            background: #1e293b;
+            border: 4px solid #000;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #fbbf24;
+            border: 4px solid #000;
+            cursor: pointer;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: #fbbf24;
+            border: 4px solid #000;
+            cursor: pointer;
+            border-radius: 0;
+        }
+
+        /* Pixel-style file input */
+        input[type=file] {
+            font-size: 0.5rem;
+            color: #94a3b8;
+            cursor: pointer;
+            width: 100%;
+        }
+        input[type=file]::file-selector-button {
+            background: #fbbf24;
+            color: #000;
+            border: 2px solid #000;
+            padding: 0.25rem 0.5rem;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.4rem;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+
+        /* Pixel-style buttons */
+        .pixel-btn {
+            background: #fbbf24;
+            color: #000;
+            border: 4px solid #000;
+            padding: 0.75rem 1rem;
+            font-size: 0.7rem;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px #000;
+            transition: all 0.1s;
+        }
+        .pixel-btn:active {
+            transform: translate(4px, 4px);
+            box-shadow: 0px 0px 0px #000;
+        }
+        .pixel-btn-secondary {
+            background: #475569;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="muteBtn" class="mute-btn">
+        🔊
+    </button>
+
+    <div id="canvas-container"></div>
+    
+    <!-- Vertical Power Bar (appears when charging) -->
+    <div id="powerBarContainer" style="
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(80px, -50%);
+        width: 24px;
+        height: 150px;
+        background: #1e293b;
+        border: 4px solid #000;
+        box-shadow: 4px 4px 0px #000;
+        display: none;
+        flex-direction: column-reverse;
+    ">
+        <div id="powerBar" style="
+            width: 100%;
+            height: 0%;
+            background: #fbbf24;
+            transition: height 0.05s;
+        "></div>
+    </div>
+
+    <div class="ui-overlay">
+        <div id="result" class="result-display">HEADS</div>
+        
+
+        <div class="flex gap-4 w-full">
+            <button id="flipBtn" class="pixel-btn flex-grow" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <span>FLIP</span>
+                <span style="font-size: 0.4rem; opacity: 0.7;">HOLD TO CHARGE</span>
+            </button>
+            <button id="resetBtn" class="pixel-btn pixel-btn-secondary">
+                R
+            </button>
+        </div>
+        <p class="text-slate-400 text-[0.6rem] mt-2">OR HOLD SPACE</p>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+
+    <script>
+        // --- Constants & Config ---
+        const CONFIG = {
+            coinRadius: 1.5,
+            coinThickness: 0.2,
+            flipForce: 25, 
+            flipTorque: 10,
+            pixelRatio: 0.25,
+            colors: {
+                floor: 0x0f172a,
+                ambient: 0x505050,
+                light: 0xffffff,
+                coinSide: 0xb59e5f
+            }
+        };
+        
+        // Calculate dynamic coin size based on viewport (NORMAL coin size - everything else is HUGE)
+        function calculateCoinSize() {
+            const vFOV = THREE.MathUtils.degToRad(45);
+            const height = 2 * Math.tan(vFOV / 2) * 12;
+            const width = height * (window.innerWidth / window.innerHeight);
+            
+            const viewportScale = Math.min(width, height);
+            const baseSize = 1.8; // Normal viewing size
+            const scaleFactor = viewportScale / 20;
+            
+            return {
+                radius: baseSize * scaleFactor,
+                thickness: 0.24 * scaleFactor
+            };
+        }
+        
+        // Update CONFIG with dynamic size
+        const dynamicSize = calculateCoinSize();
+        CONFIG.coinRadius = dynamicSize.radius;
+        CONFIG.coinThickness = dynamicSize.thickness;
+
+        // --- Audio Manager ---
+        const SoundManager = {
+            ctx: null,
+            muted: false,
+            
+            init: function() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+
+            playTone: function(freq, type, duration, vol = 0.1) {
+                if (this.muted || !this.ctx) return;
+                
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            },
+
+            playFlip: function() {
+                this.init();
+                if (this.muted) return;
+                
+                // Rising pitch "whoosh"
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(600, this.ctx.currentTime + 0.2);
+                
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            },
+
+            playHit: function(intensity) {
+                this.init();
+                if (this.muted) return;
+                
+                // Cap volume
+                const vol = Math.min(intensity / 15, 1) * 0.2;
+                if (vol < 0.01) return;
+
+                // Metallic ping
+                const freq = 1200 + (Math.random() * 200);
+                this.playTone(freq, 'sine', 0.1, vol);
+                this.playTone(freq * 1.5, 'square', 0.05, vol * 0.3);
+            },
+
+            toggleMute: function() {
+                this.muted = !this.muted;
+                const btn = document.getElementById('muteBtn');
+                btn.innerText = this.muted ? '🔇' : '🔊';
+            }
+        };
+
+        document.getElementById('muteBtn').addEventListener('click', () => SoundManager.toggleMute());
+
+
+        let scene, camera, renderer, world;
+        let coinMesh, coinBody;
+        let isFlipping = false;
+        let matHeads, matTails;
+        const physicsBottles = [];
+        
+        // Camera controls
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let cameraOffset = { x: 0, y: 2, z: 8 };
+        let cameraRotation = { horizontal: 0, vertical: 0 };
+        
+        const resultEl = document.getElementById('result');
+        const powerBar = document.getElementById('powerBar');
+        const powerBarContainer = document.getElementById('powerBarContainer');
+        
+        // Power charging state
+        let isCharging = false;
+        let chargeInterval = null;
+        const MIN_POWER = 20;
+        const MAX_POWER = 200;
+        const CHARGE_RATE = 5; // Power increase per tick
+        const CHARGE_TICK = 50; // Milliseconds between ticks
+        
+        function startCharging() {
+            if (isCharging || isFlipping) return;
+            isCharging = true;
+            CONFIG.flipForce = MIN_POWER;
+            
+            // Show the power bar
+            powerBarContainer.style.display = 'flex';
+            updatePowerBar();
+            
+            chargeInterval = setInterval(() => {
+                if (CONFIG.flipForce < MAX_POWER) {
+                    CONFIG.flipForce += CHARGE_RATE;
+                    if (CONFIG.flipForce > MAX_POWER) CONFIG.flipForce = MAX_POWER;
+                    updatePowerBar();
+                }
+            }, CHARGE_TICK);
+        }
+        
+        function stopChargingAndFlip() {
+            if (!isCharging) return;
+            isCharging = false;
+            if (chargeInterval) {
+                clearInterval(chargeInterval);
+                chargeInterval = null;
+            }
+            flipCoin();
+            
+            // Hide power bar after a short delay
+            setTimeout(() => {
+                powerBarContainer.style.display = 'none';
+                powerBarContainer.classList.remove('shake-light', 'shake-medium', 'shake-heavy');
+                CONFIG.flipForce = MIN_POWER;
+                powerBar.style.height = '0%';
+            }, 300);
+        }
+        
+        function updatePowerBar() {
+            const percent = ((CONFIG.flipForce - MIN_POWER) / (MAX_POWER - MIN_POWER)) * 100;
+            powerBar.style.height = Math.max(5, percent) + '%';
+            
+            // Remove all shake classes
+            powerBarContainer.classList.remove('shake-light', 'shake-medium', 'shake-heavy');
+            
+            // Color gradient and shake intensity based on power
+            if (percent < 40) {
+                powerBar.style.background = '#fbbf24'; // Yellow
+                // No shake at low power
+            } else if (percent < 70) {
+                powerBar.style.background = '#f97316'; // Orange
+                powerBarContainer.classList.add('shake-light');
+            } else if (percent < 90) {
+                powerBar.style.background = '#ef4444'; // Red
+                powerBarContainer.classList.add('shake-medium');
+            } else {
+                powerBar.style.background = '#dc2626'; // Dark red
+                powerBarContainer.classList.add('shake-heavy');
+            }
+        }
+
+        // --- 1. Texture Generation (Procedural Gold) ---
+        function createCoinTexture(text) {
+            const canvas = document.createElement('canvas');
+            const size = 128;
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.imageSmoothingEnabled = false;
+
+            // Background (Simple Gold)
+            ctx.fillStyle = '#fcd34d';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Darker Border
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = '#b45309';
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/2 - 4, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Inner Ring
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/2 - 16, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Text
+            ctx.fillStyle = '#78350f';
+            ctx.font = `bold ${size/2}px "Press Start 2P"`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, size/2, size/2 + size/20);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.NearestFilter;
+            texture.magFilter = THREE.NearestFilter;
+            return texture;
+        }
+
+        const headsTexture = createCoinTexture('H');
+        const tailsTexture = createCoinTexture('T');
+
+        // --- 2. Physics & Scene Initialization ---
+        function init() {
+            // -- Three.js Scene --
+            scene = new THREE.Scene();
+            scene.fog = new THREE.Fog(CONFIG.colors.floor, 20, 50);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+            camera.position.set(0, 2, 8); // Close to coin
+            camera.lookAt(0, 0, 0);
+
+            // Renderer Setup for Pixel Art
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: false,
+                alpha: false,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(CONFIG.pixelRatio);
+            renderer.shadowMap.enabled = false; // DISABLED shadows for performance
+            renderer.setClearColor(CONFIG.colors.floor);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(CONFIG.colors.ambient, 0.8);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(CONFIG.colors.light, 1);
+            dirLight.position.set(10, 20, 5);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 512;
+            dirLight.shadow.mapSize.height = 512;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 50;
+            // Expand shadow camera frustum to cover larger area
+            dirLight.shadow.camera.left = -15;
+            dirLight.shadow.camera.right = 15;
+            dirLight.shadow.camera.top = 15;
+            dirLight.shadow.camera.bottom = -15;
+            scene.add(dirLight);
+
+            // -- Cannon.js World --
+            world = new CANNON.World();
+            world.gravity.set(0, -9.82, 0);
+            world.broadphase = new CANNON.NaiveBroadphase();
+            world.solver.iterations = 15; // More iterations for better collision resolution
+            world.solver.tolerance = 0.001; // Tighter tolerance
+
+            // Materials
+            const physicsMaterial = new CANNON.Material("groundMaterial");
+            const coinMaterial = new CANNON.Material("coinMaterial");
+            const bottleMaterial = new CANNON.Material("bottleMaterial");
+            
+            // Make bottleMaterial accessible to nested functions
+            window.bottleMaterial = bottleMaterial;
+
+            const coinGroundContact = new CANNON.ContactMaterial(coinMaterial, physicsMaterial, {
+                friction: 0.3,
+                restitution: 0.6
+            });
+            world.addContactMaterial(coinGroundContact);
+            
+            // Coin-bottle collision - very bouncy, almost no friction so coin slides off
+            const coinBottleContact = new CANNON.ContactMaterial(coinMaterial, bottleMaterial, {
+                friction: 0.01,
+                restitution: 1.2, // Extra bouncy - more than 1 adds energy
+                contactEquationStiffness: 1e7,
+                contactEquationRelaxation: 5
+            });
+            world.addContactMaterial(coinBottleContact);
+            
+            // Bottle-ground collision
+            const bottleGroundContact = new CANNON.ContactMaterial(bottleMaterial, physicsMaterial, {
+                friction: 0.5,
+                restitution: 0.2,
+                contactEquationStiffness: 1e8,
+                contactEquationRelaxation: 3
+            });
+            world.addContactMaterial(bottleGroundContact);
+            
+            // Bottle-bottle collision
+            const bottleBottleContact = new CANNON.ContactMaterial(bottleMaterial, bottleMaterial, {
+                friction: 0.3,
+                restitution: 0.4
+            });
+            world.addContactMaterial(bottleBottleContact);
+
+            // Floor Body
+            const groundShape = new CANNON.Plane();
+            const groundBody = new CANNON.Body({ mass: 0, material: physicsMaterial });
+            groundBody.addShape(groundShape);
+            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+            world.addBody(groundBody);
+
+            // Visual Floor - Supermarket tile floor with color variation
+            const floorSize = 200;
+            const floorGeo = new THREE.PlaneGeometry(floorSize, floorSize);
+            
+            // Create supermarket floor texture with color
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            
+            // Warmer beige/cream tiles with variation
+            const tileSize = 64;
+            for (let x = 0; x < 512; x += tileSize) {
+                for (let y = 0; y < 512; y += tileSize) {
+                    // Random variation in tile colors (cream/beige spectrum)
+                    const variation = Math.random() * 20;
+                    const r = 240 - variation;
+                    const g = 230 - variation;
+                    const b = 210 - variation;
+                    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                    ctx.fillRect(x, y, tileSize, tileSize);
+                    
+                    // Darker grout lines
+                    ctx.strokeStyle = '#9ca3af';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x, y, tileSize, tileSize);
+                    
+                    // Occasional scuff marks
+                    if (Math.random() > 0.8) {
+                        ctx.fillStyle = `rgba(150, 150, 150, 0.1)`;
+                        ctx.fillRect(x + 10, y + 10, 40, 40);
+                    }
+                }
+            }
+            
+            const floorTexture = new THREE.CanvasTexture(canvas);
+            floorTexture.wrapS = THREE.RepeatWrapping;
+            floorTexture.wrapT = THREE.RepeatWrapping;
+            floorTexture.repeat.set(20, 20);
+            floorTexture.minFilter = THREE.NearestFilter;
+            floorTexture.magFilter = THREE.NearestFilter;
+            
+            const floorMat = new THREE.MeshLambertMaterial({ 
+                map: floorTexture
+            });
+            const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.receiveShadow = true;
+            scene.add(floorMesh);
+            
+            // Create MASSIVE baby oil bottle (from coin's perspective!)
+            function createFullSizeBottle(x, y, z, isFilled = false) {
+                const group = new THREE.Group();
+                
+                // Bottle body - GIGANTIC (15x scale)
+                const bodyGeo = new THREE.CylinderGeometry(6, 6, 27, 8);
+                const bodyMat = new THREE.MeshLambertMaterial({ 
+                    color: isFilled ? 0xffd700 : 0xffffff, // Gold if filled, clear if empty
+                    transparent: true,
+                    opacity: isFilled ? 0.7 : 0.4
+                });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                group.add(body);
+                
+                // Cap
+                const capGeo = new THREE.CylinderGeometry(3.5, 3.5, 3, 8);
+                const capMat = new THREE.MeshLambertMaterial({ color: 0x3b82f6 });
+                const cap = new THREE.Mesh(capGeo, capMat);
+                cap.position.y = 15;
+                group.add(cap);
+                
+                // Label with "BABY OIL" text
+                const labelCanvas = document.createElement('canvas');
+                labelCanvas.width = 512;
+                labelCanvas.height = 512;
+                const labelCtx = labelCanvas.getContext('2d');
+                labelCtx.imageSmoothingEnabled = false;
+                
+                // Gold background
+                labelCtx.fillStyle = '#fbbf24';
+                labelCtx.fillRect(0, 0, 512, 512);
+                
+                // Border
+                labelCtx.strokeStyle = '#d97706';
+                labelCtx.lineWidth = 8;
+                labelCtx.strokeRect(10, 10, 492, 492);
+                
+                // Text
+                labelCtx.fillStyle = '#1e293b';
+                labelCtx.font = 'bold 60px "Press Start 2P"';
+                labelCtx.textAlign = 'center';
+                labelCtx.textBaseline = 'middle';
+                labelCtx.fillText('BABY', 256, 200);
+                labelCtx.fillText('OIL', 256, 280);
+                
+                // Small print
+                labelCtx.font = '20px "Press Start 2P"';
+                labelCtx.fillText('1000 FL OZ', 256, 350);
+                
+                const labelTexture = new THREE.CanvasTexture(labelCanvas);
+                labelTexture.minFilter = THREE.NearestFilter;
+                labelTexture.magFilter = THREE.NearestFilter;
+                
+                const labelGeo = new THREE.BoxGeometry(10, 18, 0.3);
+                const labelMat = new THREE.MeshLambertMaterial({ map: labelTexture });
+                const label = new THREE.Mesh(labelGeo, labelMat);
+                label.position.z = 6;
+                group.add(label);
+                
+                group.position.set(x, y, z);
+                
+                // Add STATIC physics collision - bottles don't move but coin can hit them
+                if (y < 20) {
+                    // Box approximation of cylinder for collision
+                    const bottleShape = new CANNON.Box(new CANNON.Vec3(5, 13.5, 5));
+                    const bottleBody = new CANNON.Body({
+                        mass: 0, // Static - won't fall or clip through floor
+                        material: window.bottleMaterial,
+                        type: CANNON.Body.STATIC
+                    });
+                    bottleBody.addShape(bottleShape);
+                    bottleBody.position.set(x, y, z);
+                    
+                    world.addBody(bottleBody);
+                    
+                    // Store reference - but don't add to physicsBottles since it won't move
+                    group.userData.physicsBody = bottleBody;
+                }
+                
+                return group;
+            }
+            
+            // Create oil spill decal
+            function createOilSpill(x, z, scale) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = false;
+                
+                // Irregular oil spill shape
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.6)';
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const radius = 80 + Math.random() * 40;
+                    const px = 128 + Math.cos(angle) * radius;
+                    const py = 128 + Math.sin(angle) * radius;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                // Add shine
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.arc(128, 100, 30, 0, Math.PI * 2);
+                ctx.fill();
+                
+                const spillTexture = new THREE.CanvasTexture(canvas);
+                spillTexture.minFilter = THREE.NearestFilter;
+                spillTexture.magFilter = THREE.NearestFilter;
+                
+                const spillGeo = new THREE.PlaneGeometry(scale, scale);
+                const spillMat = new THREE.MeshLambertMaterial({ 
+                    map: spillTexture, 
+                    transparent: true,
+                    depthWrite: false
+                });
+                const spill = new THREE.Mesh(spillGeo, spillMat);
+                spill.rotation.x = -Math.PI / 2;
+                spill.position.set(x, 0.02, z);
+                return spill;
+            }
+            
+            // Create MASSIVE supermarket shelf - PACKED FULL like real store
+            function createSupermarketShelf(x, z, rotation) {
+                const shelfGroup = new THREE.Group();
+                
+                // Metal frame
+                const frameMat = new THREE.MeshLambertMaterial({ color: 0x64748b });
+                
+                // Vertical posts
+                const postGeo = new THREE.BoxGeometry(1.5, 90, 1.5);
+                for (let i = 0; i < 2; i++) {
+                    for (let j = 0; j < 2; j++) {
+                        const post = new THREE.Mesh(postGeo, frameMat);
+                        post.position.set(i * 80 - 40, 45, j * 30 - 15);
+                        shelfGroup.add(post);
+                    }
+                }
+                
+                // Shelves (6 levels - PACKED)
+                const shelfGeo = new THREE.BoxGeometry(83, 0.8, 30);
+                const shelfMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+                
+                for (let level = 0; level < 6; level++) {
+                    const shelf = new THREE.Mesh(shelfGeo, shelfMat);
+                    shelf.position.y = level * 15 + 10;
+                    shelf.receiveShadow = true;
+                    shelfGroup.add(shelf);
+                    
+                    // Add physics collision for each shelf platform
+                    const shelfShape = new CANNON.Box(new CANNON.Vec3(41.5, 0.4, 15)); // Half-extents
+                    const shelfBody = new CANNON.Body({
+                        mass: 0, // Static
+                        material: physicsMaterial,
+                        type: CANNON.Body.STATIC
+                    });
+                    shelfBody.addShape(shelfShape);
+                    
+                    // Calculate world position based on shelf group position and rotation
+                    const localY = level * 15 + 10;
+                    const cosR = Math.cos(rotation);
+                    const sinR = Math.sin(rotation);
+                    // Local shelf position is (0, localY, 0), transform to world
+                    const worldX = x;
+                    const worldZ = z;
+                    
+                    shelfBody.position.set(worldX, localY, worldZ);
+                    shelfBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), rotation);
+                    
+                    world.addBody(shelfBody);
+                    
+                    // PACK IT FULL - 6 bottles across, 2 rows deep = 12 per shelf!
+                    for (let row = 0; row < 2; row++) {
+                        for (let col = 0; col < 6; col++) {
+                            // 60% chance of being filled
+                            const isFilled = Math.random() > 0.4;
+                            const bottle = createFullSizeBottle(
+                                (col - 2.5) * 13,
+                                level * 15 + 23.9,
+                                (row - 0.5) * 13,
+                                isFilled
+                            );
+                            shelfGroup.add(bottle);
+                        }
+                    }
+                }
+                
+                // Add physics for vertical posts too
+                for (let i = 0; i < 2; i++) {
+                    for (let j = 0; j < 2; j++) {
+                        const postShape = new CANNON.Box(new CANNON.Vec3(0.75, 45, 0.75));
+                        const postBody = new CANNON.Body({
+                            mass: 0,
+                            material: physicsMaterial,
+                            type: CANNON.Body.STATIC
+                        });
+                        postBody.addShape(postShape);
+                        
+                        // Calculate world position for post
+                        const localX = i * 80 - 40;
+                        const localZ = j * 30 - 15;
+                        const cosR = Math.cos(rotation);
+                        const sinR = Math.sin(rotation);
+                        const worldX = x + localX * cosR - localZ * sinR;
+                        const worldZ = z + localX * sinR + localZ * cosR;
+                        
+                        postBody.position.set(worldX, 45, worldZ);
+                        postBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), rotation);
+                        
+                        world.addBody(postBody);
+                    }
+                }
+                
+                shelfGroup.position.set(x, 0, z);
+                shelfGroup.rotation.y = rotation;
+                return shelfGroup;
+            }
+            
+            // Add supermarket ceiling with warmer color
+            const ceilingGeo = new THREE.PlaneGeometry(300, 300);
+            const ceilingMat = new THREE.MeshLambertMaterial({ 
+                color: 0xf5f1e8, // Warm off-white
+                side: THREE.DoubleSide
+            });
+            const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.y = 100;
+            scene.add(ceiling);
+            
+            // Create supermarket skybox background
+            const skyboxCanvas = document.createElement('canvas');
+            skyboxCanvas.width = 2048;
+            skyboxCanvas.height = 1024;
+            const skyCtx = skyboxCanvas.getContext('2d');
+            
+            // Background - warm store color
+            skyCtx.fillStyle = '#ebe5d9';
+            skyCtx.fillRect(0, 0, 2048, 1024);
+            
+            // Draw distant shelving structures
+            for (let i = 0; i < 15; i++) {
+                const x = i * 140;
+                // Shelf posts
+                skyCtx.fillStyle = '#64748b';
+                skyCtx.fillRect(x, 400, 20, 400);
+                skyCtx.fillRect(x + 120, 400, 20, 400);
+                
+                // Horizontal shelves
+                skyCtx.fillStyle = '#94a3b8';
+                for (let shelf = 0; shelf < 5; shelf++) {
+                    skyCtx.fillRect(x, 500 + shelf * 80, 140, 12);
+                }
+                
+                // Colorful products on shelves
+                for (let shelf = 0; shelf < 5; shelf++) {
+                    for (let prod = 0; prod < 8; prod++) {
+                        const colors = ['#fbbf24', '#3b82f6', '#ef4444', '#10b981', '#8b5cf6'];
+                        skyCtx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+                        skyCtx.fillRect(x + 10 + prod * 15, 515 + shelf * 80, 12, 35);
+                    }
+                }
+            }
+            
+            // Add signage
+            skyCtx.fillStyle = '#ef4444';
+            skyCtx.fillRect(400, 200, 300, 80);
+            skyCtx.fillRect(1200, 200, 300, 80);
+            skyCtx.fillStyle = '#ffffff';
+            skyCtx.font = 'bold 40px Arial';
+            skyCtx.fillText('AISLE 6', 450, 250);
+            skyCtx.fillText('SPECIAL', 1230, 250);
+            
+            const skyboxTexture = new THREE.CanvasTexture(skyboxCanvas);
+            skyboxTexture.minFilter = THREE.NearestFilter;
+            skyboxTexture.magFilter = THREE.NearestFilter;
+            
+            // Create cylinder skybox (store reference for later updates)
+            const skyboxGeo = new THREE.CylinderGeometry(180, 180, 100, 32, 1, true);
+            const skyboxMat = new THREE.MeshBasicMaterial({
+                map: skyboxTexture,
+                side: THREE.BackSide
+            });
+            const skybox = new THREE.Mesh(skyboxGeo, skyboxMat);
+            skybox.position.y = 50;
+            scene.add(skybox);
+            
+            // Store skybox reference globally for image upload
+            window.skyboxMesh = skybox;
+            
+            // Warmer fluorescent lights
+            for (let i = 0; i < 6; i++) {
+                for (let j = 0; j < 5; j++) {
+                    const lightPanelGeo = new THREE.BoxGeometry(22, 0.5, 7);
+                    const lightPanelMat = new THREE.MeshBasicMaterial({ 
+                        color: 0xfff8e7 // Warm white light
+                    });
+                    const lightPanel = new THREE.Mesh(lightPanelGeo, lightPanelMat);
+                    lightPanel.position.set(
+                        (i - 2.5) * 30,
+                        98,
+                        (j - 2) * 35
+                    );
+                    scene.add(lightPanel);
+                }
+            }
+            
+            // Create compact but PACKED supermarket (smaller map, still looks full)
+            // Use consistent grid spacing for all shelves
+            const GRID_SPACING = 65;
+            
+            // Left side aisles (3 sections)
+            for (let i = 0; i < 3; i++) {
+                scene.add(createSupermarketShelf(-GRID_SPACING, i * GRID_SPACING - GRID_SPACING, Math.PI / 2));
+            }
+            
+            // Right side aisles (3 sections)
+            for (let i = 0; i < 3; i++) {
+                scene.add(createSupermarketShelf(GRID_SPACING, i * GRID_SPACING - GRID_SPACING, -Math.PI / 2));
+            }
+            
+            // Back wall endcaps - aligned to grid
+            for (let i = 0; i < 2; i++) {
+                const xPos = (i === 0) ? -GRID_SPACING / 2 : GRID_SPACING / 2;
+                scene.add(createSupermarketShelf(xPos, -GRID_SPACING * 2, 0));
+            }
+            
+            // Front wall endcaps - aligned to grid
+            for (let i = 0; i < 2; i++) {
+                const xPos = (i === 0) ? -GRID_SPACING / 2 : GRID_SPACING / 2;
+                scene.add(createSupermarketShelf(xPos, GRID_SPACING * 2, Math.PI));
+            }
+            
+            // Helper to check if position is in coin spawn zone (keep area clear)
+            const COIN_SPAWN_CLEARANCE = 25; // Keep bottles away from center
+            function isInCoinZone(x, z) {
+                return Math.abs(x) < COIN_SPAWN_CLEARANCE && Math.abs(z) < COIN_SPAWN_CLEARANCE;
+            }
+            
+            // Track all spawned bottle positions to prevent overlap
+            const spawnedBottlePositions = [];
+            const BOTTLE_MIN_DISTANCE = 20; // Minimum distance between bottle centers
+            
+            // Helper to check if position overlaps with existing bottles
+            function overlapsExistingBottle(x, z) {
+                for (const pos of spawnedBottlePositions) {
+                    const dx = x - pos.x;
+                    const dz = z - pos.z;
+                    const distance = Math.sqrt(dx * dx + dz * dz);
+                    if (distance < BOTTLE_MIN_DISTANCE) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            // Helper to find valid spawn position
+            function findValidBottlePosition(rangeX, rangeZ, maxAttempts = 50) {
+                for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                    const x = (Math.random() - 0.5) * rangeX;
+                    const z = (Math.random() - 0.5) * rangeZ;
+                    if (!isInCoinZone(x, z) && !overlapsExistingBottle(x, z)) {
+                        return { x, z, valid: true };
+                    }
+                }
+                return { x: 0, z: 0, valid: false }; // Failed to find valid position
+            }
+            
+            // Floor bottles - laying down (static, no physics movement)
+            // Visual cylinder radius is 6, so center at y=7 puts bottom at y=1 (above floor)
+            for (let i = 0; i < 8; i++) {
+                const pos = findValidBottlePosition(100, 150);
+                if (!pos.valid) continue; // Skip if no valid position found
+                
+                const xPos = pos.x;
+                const zPos = pos.z;
+                spawnedBottlePositions.push({ x: xPos, z: zPos });
+                
+                const isFilled = Math.random() > 0.5;
+                const yPos = 7; // Center height when laying on side
+                const bottle = createFullSizeBottle(xPos, yPos, zPos, isFilled);
+                
+                // Rotate visual to lay on side
+                const rotY = Math.random() * Math.PI * 2;
+                bottle.rotation.z = Math.PI / 2;
+                bottle.rotation.y = rotY;
+                
+                // Set physics body to match visual (static collision only)
+                if (bottle.userData.physicsBody) {
+                    const quatZ = new CANNON.Quaternion();
+                    quatZ.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), Math.PI / 2);
+                    const quatY = new CANNON.Quaternion();
+                    quatY.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), rotY);
+                    bottle.userData.physicsBody.quaternion = quatY.mult(quatZ);
+                    bottle.userData.physicsBody.position.set(xPos, yPos, zPos);
+                }
+                
+                scene.add(bottle);
+                
+                scene.add(createOilSpill(
+                    xPos + (Math.random() - 0.5) * 12,
+                    zPos + (Math.random() - 0.5) * 12,
+                    20 + Math.random() * 12
+                ));
+            }
+            
+            // Standing bottles (static, no physics movement)
+            // Visual cylinder half-height is 13.5, so center at y=14.5 puts bottom at y=1
+            for (let i = 0; i < 6; i++) {
+                const pos = findValidBottlePosition(90, 130);
+                if (!pos.valid) continue; // Skip if no valid position found
+                
+                const xPos = pos.x;
+                const zPos = pos.z;
+                spawnedBottlePositions.push({ x: xPos, z: zPos });
+                
+                const isFilled = Math.random() > 0.5;
+                const yPos = 14.5;
+                const bottle = createFullSizeBottle(xPos, yPos, zPos, isFilled);
+                
+                // Set physics body position (no rotation needed - upright)
+                if (bottle.userData.physicsBody) {
+                    bottle.userData.physicsBody.position.set(xPos, yPos, zPos);
+                }
+                
+                scene.add(bottle);
+            }
+            
+            // Oil spills
+            for (let i = 0; i < 20; i++) {
+                scene.add(createOilSpill(
+                    (Math.random() - 0.5) * 120,
+                    (Math.random() - 0.5) * 180,
+                    15 + Math.random() * 18
+                ));
+            }
+            
+            // Update lighting and fog with warmer tones
+            scene.background = new THREE.Color(0xebe5d9); // Warm beige background
+            scene.fog = new THREE.Fog(0xebe5d9, 40, 250);
+
+            // -- Coin Object --
+            createCoin(coinMaterial);
+
+            animate();
+        }
+
+        function createCoin(material) {
+            const geometry = new THREE.CylinderGeometry(CONFIG.coinRadius, CONFIG.coinRadius, CONFIG.coinThickness, 16);
+            
+            const matSide = new THREE.MeshLambertMaterial({ color: CONFIG.colors.coinSide });
+            matHeads = new THREE.MeshLambertMaterial({ map: headsTexture });
+            matTails = new THREE.MeshLambertMaterial({ map: tailsTexture });
+
+            coinMesh = new THREE.Mesh(geometry, [matSide, matHeads, matTails]);
+            coinMesh.castShadow = true;
+            scene.add(coinMesh);
+
+            // Physics Body
+            const shape = new CANNON.Cylinder(CONFIG.coinRadius, CONFIG.coinRadius, CONFIG.coinThickness, 16);
+            const q = new CANNON.Quaternion();
+            q.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+            
+            coinBody = new CANNON.Body({
+                mass: 5,
+                material: material,
+                shape: shape,
+                quaternion: q
+            });
+            
+            coinBody.linearDamping = 0.4; 
+            coinBody.angularDamping = 0.4;
+            coinBody.position.set(0, 2, 0); 
+            
+            // Add Collision Sound
+            coinBody.addEventListener("collide", (e) => {
+                try {
+                    const relativeVelocity = e.contact.getImpactVelocityAlongNormal();
+                    if (Math.abs(relativeVelocity) > 0.5 && SoundManager.audioContext) {
+                        SoundManager.playHit(Math.abs(relativeVelocity));
+                    }
+                } catch (err) {
+                    console.warn("Collision sound error:", err);
+                }
+            });
+
+            world.addBody(coinBody);
+        }
+
+        // --- 3. Interaction Logic ---
+        function flipCoin() {
+            if (isFlipping) return;
+            
+            SoundManager.init();
+            SoundManager.playFlip();
+
+            resultEl.classList.remove('visible');
+            isFlipping = true;
+
+            coinBody.position.set(0, 3, 0);
+            coinBody.velocity.set(0,0,0);
+            coinBody.angularVelocity.set(0,0,0);
+            
+            // Random starting tilt for varied arc
+            const startTiltX = (Math.random() - 0.5) * 0.5;
+            const startTiltZ = (Math.random() - 0.5) * 0.5;
+            coinBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, startTiltZ, startTiltX), Math.PI/2);
+
+            // Highly varied launch direction with power scaling
+            const angle = Math.random() * Math.PI * 2; // Random angle 0-360 degrees
+            const powerRatio = CONFIG.flipForce / 200; // 0 to 1 based on charge
+            
+            // MUCH stronger horizontal force - scales significantly with power
+            const baseHorizontal = 25 + Math.random() * 35; // 25-60 base
+            const powerHorizontal = powerRatio * (40 + Math.random() * 60); // 0-100 extra based on power
+            const horizontalForce = baseHorizontal + powerHorizontal;
+            
+            // Add some asymmetry - sometimes favor one direction more
+            const asymmetry = (Math.random() - 0.5) * 0.8; // -0.4 to 0.4
+            const launchX = Math.cos(angle + asymmetry) * horizontalForce * (0.8 + Math.random() * 0.5);
+            const launchZ = Math.sin(angle - asymmetry) * horizontalForce * (0.8 + Math.random() * 0.5);
+
+            // Vertical force with more variance
+            const verticalVariance = (Math.random() - 0.5) * CONFIG.flipForce * 0.4;
+            const verticalForce = CONFIG.flipForce + verticalVariance;
+
+            const force = new CANNON.Vec3(
+                launchX, 
+                verticalForce,
+                launchZ
+            );
+            coinBody.applyImpulse(force, coinBody.position);
+
+            // Highly varied spin - different axes get different amounts
+            const spinIntensity = 1 + powerRatio * 2; // More power = more spin
+            const rx = (Math.random() - 0.5) * CONFIG.flipTorque * 4 * spinIntensity;
+            const rz = (Math.random() - 0.5) * CONFIG.flipTorque * 4 * spinIntensity;
+            const ry = (Math.random() - 0.5) * 15 * spinIntensity; // Wobble spin
+            
+            // Occasionally add extra tumble
+            const tumbleChance = Math.random();
+            const tumbleBonus = tumbleChance > 0.7 ? (Math.random() * 10) : 0;
+
+            coinBody.angularVelocity.set(rx + tumbleBonus, ry, rz + tumbleBonus);
+        }
+
+        function resetCoin() {
+            coinBody.position.set(0, 2, 0);
+            coinBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), Math.PI/2);
+            coinBody.velocity.set(0,0,0);
+            coinBody.angularVelocity.set(0,0,0);
+            resultEl.classList.remove('visible');
+            isFlipping = false;
+        }
+
+        function checkResult() {
+            if (!isFlipping) return;
+
+            const speed = coinBody.velocity.length();
+            const rotSpeed = coinBody.angularVelocity.length();
+            const onGround = coinBody.position.y < CONFIG.coinRadius + 1;
+            const stuckOnBottle = coinBody.position.y > CONFIG.coinRadius + 2 && speed < 0.5 && rotSpeed < 0.5;
+            
+            // If coin is stuck on a bottle, give it a nudge to roll off
+            if (stuckOnBottle) {
+                const nudgeX = (Math.random() - 0.5) * 10;
+                const nudgeZ = (Math.random() - 0.5) * 10;
+                coinBody.applyImpulse(
+                    new CANNON.Vec3(nudgeX, 2, nudgeZ),
+                    coinBody.position
+                );
+                return;
+            }
+
+            if (speed < 0.05 && rotSpeed < 0.1 && onGround) {
+                isFlipping = false;
+                
+                const localUp = new THREE.Vector3(0, 1, 0);
+                localUp.applyQuaternion(coinMesh.quaternion);
+                
+                if (localUp.y > 0) {
+                    resultEl.innerText = "HEADS";
+                    resultEl.style.color = "#fbbf24"; 
+                } else {
+                    resultEl.innerText = "TAILS";
+                    resultEl.style.color = "#94a3b8"; 
+                }
+                
+                resultEl.classList.add('visible');
+            }
+        }
+
+        // NOTE: Coin face and environment customization removed from UI
+        // See README for how to customize these in code
+        // See README for how to customize environment background in code
+
+        // --- 5. Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            world.step(1 / 60);
+            
+            // Update coin
+            coinMesh.position.copy(coinBody.position);
+            coinMesh.quaternion.copy(coinBody.quaternion);
+            
+            const correction = new THREE.Quaternion();
+            correction.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+            coinMesh.quaternion.multiply(correction);
+
+            // Update physics bottles
+            physicsBottles.forEach(bottle => {
+                if (bottle.userData.physicsBody) {
+                    bottle.position.copy(bottle.userData.physicsBody.position);
+                    bottle.quaternion.copy(bottle.userData.physicsBody.quaternion);
+                }
+            });
+
+            // Camera follows coin with rotation controls
+            const targetX = coinBody.position.x;
+            const targetY = coinBody.position.y;
+            const targetZ = coinBody.position.z;
+            
+            // Apply rotation to offset
+            const distance = 8;
+            const offsetX = Math.sin(cameraRotation.horizontal) * distance * Math.cos(cameraRotation.vertical);
+            const offsetY = 2 + Math.sin(cameraRotation.vertical) * distance;
+            const offsetZ = Math.cos(cameraRotation.horizontal) * distance * Math.cos(cameraRotation.vertical);
+            
+            // Lerp camera position
+            const lerpFactor = 0.15;
+            camera.position.x += (targetX + offsetX - camera.position.x) * lerpFactor;
+            camera.position.y += (targetY + offsetY - camera.position.y) * lerpFactor;
+            camera.position.z += (targetZ + offsetZ - camera.position.z) * lerpFactor;
+            
+            // Prevent camera from going below the floor
+            const MIN_CAMERA_HEIGHT = 1.5;
+            if (camera.position.y < MIN_CAMERA_HEIGHT) {
+                camera.position.y = MIN_CAMERA_HEIGHT;
+            }
+            
+            // Always look at the coin
+            camera.lookAt(targetX, targetY, targetZ);
+
+            checkResult();
+
+            renderer.render(scene, camera);
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('resize', () => {
+            // Guard against resize before init completes
+            if (!camera || !renderer) return;
+            
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            // Recalculate and update coin size
+            const newSize = calculateCoinSize();
+            const scaleX = newSize.radius / CONFIG.coinRadius;
+            const scaleY = newSize.thickness / CONFIG.coinThickness;
+            
+            CONFIG.coinRadius = newSize.radius;
+            CONFIG.coinThickness = newSize.thickness;
+            
+            // Scale the coin mesh (guard against undefined)
+            if (coinMesh) {
+                coinMesh.scale.set(scaleX, scaleY, scaleX);
+            }
+            
+            // Update physics body scale (approximate by adjusting mass)
+            if (coinBody) {
+                const volumeScale = scaleX * scaleX * scaleY;
+                coinBody.mass = 5 * volumeScale;
+                coinBody.updateMassProperties();
+            }
+        });
+
+        // Flip button - hold to charge, release to flip
+        const flipBtn = document.getElementById('flipBtn');
+        
+        flipBtn.addEventListener('mousedown', startCharging);
+        flipBtn.addEventListener('mouseup', stopChargingAndFlip);
+        flipBtn.addEventListener('mouseleave', () => {
+            if (isCharging) stopChargingAndFlip();
+        });
+        
+        // Touch support for mobile
+        flipBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startCharging();
+        });
+        flipBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopChargingAndFlip();
+        });
+        
+        document.getElementById('resetBtn').addEventListener('click', resetCoin);
+        
+        // Spacebar - hold to charge, release to flip
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat) {
+                e.preventDefault();
+                startCharging();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                stopChargingAndFlip();
+            }
+        });
+
+        // Initialize first, then set up mouse controls
+        init();
+
+        // Mouse controls for camera rotation (must be after init() creates renderer)
+        renderer.domElement.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+
+        renderer.domElement.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            const deltaX = e.clientX - previousMousePosition.x;
+            const deltaY = e.clientY - previousMousePosition.y;
+
+            cameraRotation.horizontal += deltaX * 0.005;
+            cameraRotation.vertical += deltaY * 0.005;
+
+            // Clamp vertical rotation
+            cameraRotation.vertical = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, cameraRotation.vertical));
+
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+
+        renderer.domElement.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        renderer.domElement.addEventListener('mouseleave', () => {
+            isDragging = false;
+        });
+
+    </script>
+</body>
+</html>
