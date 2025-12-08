@@ -346,6 +346,13 @@
         let previousMousePosition = { x: 0, y: 0 };
         let cameraOffset = { x: 0, y: 2, z: 8 };
         let cameraRotation = { horizontal: 0, vertical: 0 };
+        let cameraZoom = 8; // Distance from coin
+        const ZOOM_MIN = 3;
+        const ZOOM_MAX = 25;
+        
+        // Touch controls state
+        let touchStartDistance = 0;
+        let lastTouchPositions = [];
         
         const resultEl = document.getElementById('result');
         const powerBar = document.getElementById('powerBar');
@@ -1264,11 +1271,10 @@
             const targetY = coinBody.position.y;
             const targetZ = coinBody.position.z;
             
-            // Apply rotation to offset
-            const distance = 8;
-            const offsetX = Math.sin(cameraRotation.horizontal) * distance * Math.cos(cameraRotation.vertical);
-            const offsetY = 2 + Math.sin(cameraRotation.vertical) * distance;
-            const offsetZ = Math.cos(cameraRotation.horizontal) * distance * Math.cos(cameraRotation.vertical);
+            // Apply rotation to offset with zoom
+            const offsetX = Math.sin(cameraRotation.horizontal) * cameraZoom * Math.cos(cameraRotation.vertical);
+            const offsetY = 2 + Math.sin(cameraRotation.vertical) * cameraZoom;
+            const offsetZ = Math.cos(cameraRotation.horizontal) * cameraZoom * Math.cos(cameraRotation.vertical);
             
             // Lerp camera position
             const lerpFactor = 0.15;
@@ -1386,6 +1392,68 @@
         renderer.domElement.addEventListener('mouseleave', () => {
             isDragging = false;
         });
+
+        // Scroll wheel zoom
+        renderer.domElement.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomSpeed = 0.5;
+            cameraZoom += e.deltaY > 0 ? zoomSpeed : -zoomSpeed;
+            cameraZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, cameraZoom));
+        }, { passive: false });
+
+        // Touch controls for mobile
+        function getTouchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                // Single finger - start drag
+                isDragging = true;
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.touches.length === 2) {
+                // Two fingers - start pinch zoom
+                isDragging = false;
+                touchStartDistance = getTouchDistance(e.touches);
+            }
+            lastTouchPositions = Array.from(e.touches).map(t => ({ x: t.clientX, y: t.clientY }));
+        }, { passive: true });
+
+        renderer.domElement.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1 && isDragging) {
+                // Single finger drag - rotate camera
+                const deltaX = e.touches[0].clientX - previousMousePosition.x;
+                const deltaY = e.touches[0].clientY - previousMousePosition.y;
+
+                cameraRotation.horizontal += deltaX * 0.008;
+                cameraRotation.vertical += deltaY * 0.008;
+                cameraRotation.vertical = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, cameraRotation.vertical));
+
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.touches.length === 2) {
+                // Two finger pinch - zoom
+                const currentDistance = getTouchDistance(e.touches);
+                const delta = touchStartDistance - currentDistance;
+                const zoomSpeed = 0.02;
+                
+                cameraZoom += delta * zoomSpeed;
+                cameraZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, cameraZoom));
+                
+                touchStartDistance = currentDistance;
+            }
+        }, { passive: true });
+
+        renderer.domElement.addEventListener('touchend', (e) => {
+            if (e.touches.length === 0) {
+                isDragging = false;
+            } else if (e.touches.length === 1) {
+                // Went from 2 fingers to 1, restart drag
+                isDragging = true;
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+        }, { passive: true });
 
     </script>
 </body>
