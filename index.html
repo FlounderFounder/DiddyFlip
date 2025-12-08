@@ -459,29 +459,40 @@
             return texture;
         }
 
-        // Load custom heads image, fallback to generated texture
-        let headsTexture;
-        const headsLoader = new THREE.TextureLoader();
-        headsLoader.load(
-            'assets/heads.png',
-            function(texture) {
-                texture.minFilter = THREE.NearestFilter;
-                texture.magFilter = THREE.NearestFilter;
+        // Load custom heads image from multiple sources (GitHub raw, local, fallback)
+        let headsTexture = createCoinTexture('H'); // Initial fallback
+        const tailsTexture = createCoinTexture('T');
+        
+        // Try loading custom heads image
+        const headsImageUrls = [
+            'assets/heads.png', // Local/deployed path
+            'https://raw.githubusercontent.com/FlounderFounder/DiddyFlip/main/assets/heads.png' // GitHub raw
+        ];
+        
+        function tryLoadHeadsImage(urlIndex) {
+            if (urlIndex >= headsImageUrls.length) return; // All sources failed, keep fallback
+            
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+                const texture = new THREE.Texture(img);
+                texture.needsUpdate = true;
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
                 headsTexture = texture;
                 if (matHeads) {
                     matHeads.map = texture;
                     matHeads.needsUpdate = true;
                 }
-            },
-            undefined,
-            function() {
-                // Fallback to generated texture if image not found
-                headsTexture = createCoinTexture('H');
-            }
-        );
-        headsTexture = createCoinTexture('H'); // Initial fallback
-        
-        const tailsTexture = createCoinTexture('T');
+                console.log('Loaded heads image from:', headsImageUrls[urlIndex]);
+            };
+            img.onerror = function() {
+                console.log('Failed to load from:', headsImageUrls[urlIndex]);
+                tryLoadHeadsImage(urlIndex + 1); // Try next source
+            };
+            img.src = headsImageUrls[urlIndex];
+        }
+        tryLoadHeadsImage(0);
 
         // --- 2. Physics & Scene Initialization ---
         function init() {
