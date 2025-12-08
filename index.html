@@ -466,40 +466,62 @@
             return texture;
         }
 
-        // Load custom heads image from multiple sources (GitHub raw, local, fallback)
+        // Load custom coin images from multiple sources (GitHub raw, local, fallback)
         let headsTexture = createCoinTexture('H'); // Initial fallback
-        const tailsTexture = createCoinTexture('T');
+        let tailsTexture = createCoinTexture('T'); // Initial fallback
         
-        // Try loading custom heads image
-        const headsImageUrls = [
-            'assets/heads.png', // Local/deployed path
-            'https://raw.githubusercontent.com/FlounderFounder/DiddyFlip/main/assets/heads.png' // GitHub raw
-        ];
-        
-        function tryLoadHeadsImage(urlIndex) {
-            if (urlIndex >= headsImageUrls.length) return; // All sources failed, keep fallback
+        // Generic function to load coin face images
+        function loadCoinImage(localPath, githubPath, fallbackTexture, materialRef, materialName) {
+            const urls = [localPath, githubPath];
             
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = function() {
-                const texture = new THREE.Texture(img);
-                texture.needsUpdate = true;
-                texture.minFilter = THREE.LinearFilter;
-                texture.magFilter = THREE.LinearFilter;
-                headsTexture = texture;
-                if (matHeads) {
-                    matHeads.map = texture;
-                    matHeads.needsUpdate = true;
-                }
-                console.log('Loaded heads image from:', headsImageUrls[urlIndex]);
-            };
-            img.onerror = function() {
-                console.log('Failed to load from:', headsImageUrls[urlIndex]);
-                tryLoadHeadsImage(urlIndex + 1); // Try next source
-            };
-            img.src = headsImageUrls[urlIndex];
+            function tryLoad(urlIndex) {
+                if (urlIndex >= urls.length) return; // All sources failed, keep fallback
+                
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = function() {
+                    const texture = new THREE.Texture(img);
+                    texture.needsUpdate = true;
+                    texture.minFilter = THREE.LinearFilter;
+                    texture.magFilter = THREE.LinearFilter;
+                    
+                    if (materialName === 'heads') {
+                        headsTexture = texture;
+                        if (matHeads) {
+                            matHeads.map = texture;
+                            matHeads.needsUpdate = true;
+                        }
+                    } else {
+                        tailsTexture = texture;
+                        if (matTails) {
+                            matTails.map = texture;
+                            matTails.needsUpdate = true;
+                        }
+                    }
+                    console.log('Loaded ' + materialName + ' image from:', urls[urlIndex]);
+                };
+                img.onerror = function() {
+                    console.log('Failed to load ' + materialName + ' from:', urls[urlIndex]);
+                    tryLoad(urlIndex + 1);
+                };
+                img.src = urls[urlIndex];
+            }
+            tryLoad(0);
         }
-        tryLoadHeadsImage(0);
+        
+        // Load heads image
+        loadCoinImage(
+            'assets/heads.png',
+            'https://raw.githubusercontent.com/FlounderFounder/DiddyFlip/main/assets/heads.png',
+            headsTexture, matHeads, 'heads'
+        );
+        
+        // Load tails image
+        loadCoinImage(
+            'assets/tails.png',
+            'https://raw.githubusercontent.com/FlounderFounder/DiddyFlip/main/assets/tails.png',
+            tailsTexture, matTails, 'tails'
+        );
 
         // --- 2. Physics & Scene Initialization ---
         function init() {
