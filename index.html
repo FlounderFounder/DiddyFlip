@@ -459,7 +459,28 @@
             return texture;
         }
 
-        const headsTexture = createCoinTexture('H');
+        // Load custom heads image, fallback to generated texture
+        let headsTexture;
+        const headsLoader = new THREE.TextureLoader();
+        headsLoader.load(
+            'assets/heads.png',
+            function(texture) {
+                texture.minFilter = THREE.NearestFilter;
+                texture.magFilter = THREE.NearestFilter;
+                headsTexture = texture;
+                if (matHeads) {
+                    matHeads.map = texture;
+                    matHeads.needsUpdate = true;
+                }
+            },
+            undefined,
+            function() {
+                // Fallback to generated texture if image not found
+                headsTexture = createCoinTexture('H');
+            }
+        );
+        headsTexture = createCoinTexture('H'); // Initial fallback
+        
         const tailsTexture = createCoinTexture('T');
 
         // --- 2. Physics & Scene Initialization ---
